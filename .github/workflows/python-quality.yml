@@ -1,0 +1,50 @@
+name: Shared Python Quality
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version used for checks
+        required: false
+        type: string
+        default: "3.12"
+      compile-path:
+        description: Source path for Python compilation
+        required: false
+        type: string
+        default: "."
+      test-command:
+        description: Repository-owned command that runs tests
+        required: false
+        type: string
+        default: "python -m unittest discover -v"
+
+permissions:
+  contents: read
+
+jobs:
+  python-quality:
+    name: Python quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out caller repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Compile sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q "${{ inputs.compile-path }}"
+
+      - name: Run tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ inputs.test-command }}
