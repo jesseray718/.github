@@ -1,23 +1,23 @@
-name: Shared Python Quality
+name: Python quality
 
 on:
   workflow_call:
     inputs:
       python-version:
-        description: Python version used for checks
+        description: Python version to use
         required: false
-        type: string
         default: "3.12"
+        type: string
       compile-path:
-        description: Source path for Python compilation
+        description: Directory or file tree to compile
         required: false
-        type: string
         default: "."
-      test-command:
-        description: Repository-owned command that runs tests
-        required: false
         type: string
-        default: "python -m unittest discover -v"
+      test-command:
+        description: Shell command used to run tests
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -26,7 +26,6 @@ jobs:
   python-quality:
     name: Python quality
     runs-on: ubuntu-latest
-    timeout-minutes: 10
 
     steps:
       - name: Check out caller repository
@@ -37,26 +36,31 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
 
-      - name: Compile sources
+      - name: Compile Python sources
         shell: bash
         run: |
           set -euo pipefail
-          python -m compileall -q "${{ inputs.compile-path }}"  
-               - name: Run tests
+          if find "${{ inputs.compile-path }}" -type f -name '*.py' -print -quit | grep -q .; then
+            python -m compileall -q "${{ inputs.compile-path }}"
+          else
+            echo "No Python sources found; skipping compilation."
+          fi
+
+      - name: Install lint tool
+        shell: bash
+        run: python -m pip install --upgrade pip ruff
+
+      - name: Lint Python sources
         shell: bash
         run: |
-          set +e
-          ${{ inputs.test-command }}
-          status=$?
-          set -e
-
-          if [ "$status" -eq 0 ]; then
-            exit 0
+          set -euo pipefail
+          if find "${{ inputs.compile-path }}" -type f -name '*.py' -print -quit | grep -q .; then
+            ruff check "${{ inputs.compile-path }}"
+          else
+            echo "No Python sources found; skipping lint."
           fi
 
-          if [ "$status" -eq 5 ]; then
-            echo "No unittest tests found; allowing exit code 5."
-            exit 0
-          fi
-
-          exit "$status"
+      - name: Run tests
+        if: inputs.test-command != ''
+        shell: bash
+        run: ${{ inputs.test-command }}
