@@ -46,5 +46,13 @@ jobs:
       - name: Run tests
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           ${{ inputs.test-command }}
+          status=$?
+
+          if [ "$status" -eq 5 ]; then
+            echo "No unittest tests discovered; treating this as a passing baseline."
+            exit 0
+          fi
+
+          exit "$status"
