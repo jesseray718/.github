@@ -41,17 +41,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m compileall -q "${{ inputs.compile-path }}"
-
-      - name: Run tests
+          python -m compileall -q "${{ inputs.compile-path }}"  
+               - name: Run tests
         shell: bash
         run: |
-          set -uo pipefail
+          set +e
           ${{ inputs.test-command }}
           status=$?
+          set -e
+
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
 
           if [ "$status" -eq 5 ]; then
-            echo "No unittest tests discovered; treating this as a passing baseline."
+            echo "No unittest tests found; allowing exit code 5."
             exit 0
           fi
 
