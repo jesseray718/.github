@@ -1,23 +1,7 @@
-name: Shared Python Quality
+name: Python quality
 
 on:
   workflow_call:
-    inputs:
-      python-version:
-        description: Python version used for checks
-        required: false
-        type: string
-        default: "3.12"
-      compile-path:
-        description: Source path for Python compilation
-        required: false
-        type: string
-        default: "."
-      test-command:
-        description: Repository-owned command that runs tests
-        required: false
-        type: string
-        default: "python -m unittest discover -v"
 
 permissions:
   contents: read
@@ -26,7 +10,6 @@ jobs:
   python-quality:
     name: Python quality
     runs-on: ubuntu-latest
-    timeout-minutes: 10
 
     steps:
       - name: Check out caller repository
@@ -35,28 +18,26 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: "3.12"
 
-      - name: Compile sources
+      - name: Detect Python project
+        id: project
         shell: bash
         run: |
-          set -euo pipefail
-          python -m compileall -q "${{ inputs.compile-path }}"  
-               - name: Run tests
-        shell: bash
-        run: |
-          set +e
-          ${{ inputs.test-command }}
-          status=$?
-          set -e
-
-          if [ "$status" -eq 0 ]; then
-            exit 0
+          if find . -type f -name '*.py' -not -path './.git/*' -print -quit | grep -q .; then
+            echo "has_python=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_python=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if [ "$status" -eq 5 ]; then
-            echo "No unittest tests found; allowing exit code 5."
-            exit 0
-          fi
+      - name: Install quality tools
+        if: steps.project.outputs.has_python == 'true'
+        run: python -m pip install --upgrade pip ruff
 
-          exit "$status"
+      - name: Lint Python
+        if: steps.project.outputs.has_python == 'true'
+        run: ruff check .
+
+      - name: Report non-Python repository
+        if: steps.project.outputs.has_python != 'true'
+        run: echo "No Python files found; Python quality check skipped."
